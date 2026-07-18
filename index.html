@@ -2287,44 +2287,37 @@ function renderPattern(){
       }
       tctx.restore();
     }
-    /* 定規はプレビュー枠（キャンバス上端・左端）に固定表示（2026-07-19再設計）。
-       生地の縁に目盛りを貼り付ける旧方式は、生地サイズに引きずられて見た目が暴れるため、
-       Illustrator式の「枠ルーラー帯＋生地cm座標に整列したティック」に変更。
-       0cm＝生地の左上角。ティック・数字は生地の範囲内のみ描く */
-    const band=Math.max(0,Math.min(34*pxScaleU,ox*0.9,oy*0.9)); // ルーラー帯の厚み（画面上約34px相当）
-    if(band>10){
-      /* 帯の背景＋境界線 */
-      tctx.fillStyle='rgba(249,246,240,.95)';
-      tctx.fillRect(0,0,tw,band);tctx.fillRect(0,0,band,th);
-      tctx.strokeStyle='rgba(43,38,32,.28)';tctx.lineWidth=1;
-      tctx.beginPath();tctx.moveTo(0,Math.round(band)+0.5);tctx.lineTo(tw,Math.round(band)+0.5);tctx.stroke();
-      tctx.beginPath();tctx.moveTo(Math.round(band)+0.5,0);tctx.lineTo(Math.round(band)+0.5,th);tctx.stroke();
-      const fs=Math.round(band*0.5);
-      tctx.font=fs+'px ui-monospace,monospace';
-      tctx.fillStyle='rgba(43,38,32,.78)';tctx.strokeStyle='#2b2620';
-      /* ラベル刻みは表示幅に応じて自動（1→2→5→10→20→50→100cm）。詰まったら間引く */
-      const labNeed=tctx.measureText('000').width*1.5;
-      const stepFor=cmPx=>{for(const s of[1,2,5,10,20,50,100])if(s*cmPx>=labNeed)return s;return 200;};
-      const lsX=stepFor(cmPxX),lsY=stepFor(cmPxY);
-      const mTickX=cmPxX>=8*pxScaleU?1:Math.max(1,Math.round(lsX/5));
-      const mTickY=cmPxY>=8*pxScaleU?1:Math.max(1,Math.round(lsY/5));
-      for(let i=0,x=ox;x<=ox+dw+0.5;i++,x=ox+i*cmPxX){
-        if(i%mTickX)continue;
-        const major=i%lsX===0;
-        tctx.lineWidth=major?1.5:1;
-        tctx.beginPath();tctx.moveTo(Math.round(x)+0.5,band);
-        tctx.lineTo(Math.round(x)+0.5,band-(major?band*0.42:band*0.24));tctx.stroke();
-        if(major&&i>0)tctx.fillText(String(i),Math.round(x)+3*pxScaleU,band*0.48);
-      }
-      for(let i=0,y=oy;y<=oy+dh+0.5;i++,y=oy+i*cmPxY){
-        if(i%mTickY)continue;
-        const major=i%lsY===0;
-        tctx.lineWidth=major?1.5:1;
-        tctx.beginPath();tctx.moveTo(band,Math.round(y)+0.5);
-        tctx.lineTo(band-(major?band*0.42:band*0.24),Math.round(y)+0.5);tctx.stroke();
-        if(major&&i>0){const s2=String(i);tctx.fillText(s2,Math.max(1,band*0.5-tctx.measureText(s2).width),Math.round(y)-3*pxScaleU);}
-      }
+    /* 定規は敷き詰め表示（drawSurface）と完全に同一様式に統一（2026-07-19）:
+       白帯RW=36・font22px・5cm主目盛(major14px/minor8px)・角に「cm」。
+       違いは原点のみ＝0cm を生地の左上角に整列（敷き詰めは帯の縁が0）。
+       表示モードで定規の見た目が変わる問題（自由配置＝1リピート画面だけ別物に見える）の解消 */
+    const RW=36;
+    tctx.fillStyle='rgba(255,255,255,.88)';
+    tctx.fillRect(0,0,tw,RW);tctx.fillRect(0,RW,RW,th-RW);
+    tctx.strokeStyle='rgba(43,38,32,.45)';tctx.lineWidth=1;
+    tctx.beginPath();tctx.moveTo(0,RW-0.5);tctx.lineTo(tw,RW-0.5);tctx.moveTo(RW-0.5,RW);tctx.lineTo(RW-0.5,th);tctx.stroke();
+    tctx.font='22px ui-monospace,monospace';
+    const minorX=cmPxX>=18,minorY=cmPxY>=18;
+    /* 数値ラベルの間引きは敷き詰めと同式（低ズーム相当では10cmごと。巨大リピートはさらに粗く） */
+    const lblStep=cmPx=>5*cmPx>=56?5:10*cmPx>=56?10:20*cmPx>=56?20:50;
+    const lblX=lblStep(cmPxX),lblY=lblStep(cmPxY);
+    for(let i=0,x=ox;x<=ox+dw+0.5;i++,x=ox+i*cmPxX){
+      if(x<RW)continue;
+      if(!minorX&&i%5)continue;
+      const major=i%5===0,xx=Math.round(x)+0.5;
+      tctx.strokeStyle='#2b2620';tctx.lineWidth=major?2:1;
+      tctx.beginPath();tctx.moveTo(xx,RW);tctx.lineTo(xx,RW-(major?14:8));tctx.stroke();
+      if(major&&i%lblX===0&&i>0){tctx.fillStyle='#2b2620';tctx.fillText(String(i),xx+4,RW-16);}
     }
+    for(let i=0,y=oy;y<=oy+dh+0.5;i++,y=oy+i*cmPxY){
+      if(y<RW)continue;
+      if(!minorY&&i%5)continue;
+      const major=i%5===0,yy=Math.round(y)+0.5;
+      tctx.strokeStyle='#2b2620';tctx.lineWidth=major?2:1;
+      tctx.beginPath();tctx.moveTo(RW,yy);tctx.lineTo(RW-(major?14:8),yy);tctx.stroke();
+      if(major&&i%lblY===0&&i>0){tctx.fillStyle='#2b2620';tctx.fillText(String(i),3,yy-5);}
+    }
+    tctx.fillStyle='#2b2620';tctx.fillText('cm',5,25);
     tctx.restore();
     /* リピート全体の実寸ラベル（生地の下・右に固定）。画面上で常に約22px相当 */
     const labelFsU=Math.round(22*pxScaleU);
