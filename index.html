@@ -995,7 +995,7 @@ function applyMotifPreset(spec){
     state.srcPxMax=Math.max(...fulls.map(c=>Math.max(c.width,c.height)));
     applySizeGuard();
     state.repeat=spec.repeat;state.dropDen=2;
-    state.sizeCm=spec.sizeCm;state.density=spec.density;state.rot=spec.rot;
+    setSizeCm(spec.sizeCm);state.density=spec.density;state.rot=spec.rot;
     if(!state.bgTouched)state.bg=spec.bg;
     state.filler={type:'none',motifIdx:-1,motif:null};
     /* UI同期（旧applyPresetの流儀） */
@@ -1058,7 +1058,7 @@ function applySizeGuard(){
     if(cap<hard)g.textContent='この絵の解像度では最大 '+cap+'cm まで（プリント品質150dpiを守るための上限です）';
   }
   if(state.sizeCm>cap){
-    state.sizeCm=cap;
+    setSizeCm(cap);
     $('#size').value=cap;$('#sizeN').value=cap;
     $('#sizeV').innerHTML=cap+'<small>cm・'+(tile?'タイル幅':sizeLabel(cap))+'</small>';
     clearUnitCache();rebuild();
@@ -1503,16 +1503,27 @@ function poissonTor(W,H,r,rand,seeds){
 /* buildLayout: 正規化レイアウト {UW,UH,type,places[[x,y,mi,rot,flip,sc]],paws,pitch} */
 /* ---- F25 自由配置（freeform） ----
    items をそのまま places=[x,y,mi,rot,flip,sc] に写すだけで、renderUnit の
-   3×3ラップ描画に乗る＝継ぎ目なしが自動で担保される。枠は UW=UH=FF_R（モチーフ
-   FF_R個分の正方形）。リピート全体の実寸は「柄の大きさ」sizeCm×FF_R。 */
-const FF_R=3;
+   3×3ラップ描画に乗る＝継ぎ目なしが自動で担保される。
+   2026-07-19修正: 生地ブロックは FF_BLOCK_CM 角で【固定】。「柄の大きさ」sizeCm は
+   モチーフの実寸だけに効く（旧仕様 sizeCm×FF_R はスライダーで生地サイズごと変わってしまった）。
+   アイテム座標の単位は従来どおり「1単位=sizeCm」なので、sizeCm変更時は setSizeCm() が
+   旧新比で座標を換算し、ブロック内のcm位置を保つ */
+const FF_R=3,FF_BLOCK_CM=21;
+function ffUnits(){return FF_BLOCK_CM/Math.max(0.1,state.sizeCm);} // ブロック一辺のレイアウト単位数
+function setSizeCm(v){ // sizeCmの書き換えは必ずここを通す（自由配置アイテムのcm位置維持）
+  const o=state.sizeCm;state.sizeCm=v;
+  if(o!==v&&state.freeform&&state.freeform.items.length){
+    const f=o/v;state.freeform.items.forEach(it=>{it.x*=f;it.y*=f;});
+  }
+}
 function ffEnsure(){
   const ff=state.freeform;
   ff.items=ff.items.filter(it=>it.mi<state.motifs.length);
   if(ff.sel>=ff.items.length)ff.sel=-1;
-  if(!ff.items.length&&state.motifs.length){ // 初回: 現モチーフを緩い格子で1個ずつ
+  if(!ff.items.length&&state.motifs.length){ // 初回: 現モチーフを緩い格子で1個ずつ（ブロックに合わせて配置）
+    const k=ffUnits()/FF_R;
     state.motifs.forEach((m,i)=>{
-      ff.items.push({mi:i,x:0.6+(i%3),y:(0.6+Math.floor(i/3))%FF_R,rot:0,sc:1});
+      ff.items.push({mi:i,x:(0.6+(i%3))*k,y:((0.6+Math.floor(i/3))%FF_R)*k,rot:0,sc:1});
     });
   }
 }
@@ -1521,7 +1532,8 @@ function buildLayout(){
   if(state.mode!=='tile'&&state.repeat==='freeform'){ // F25
     ffEnsure();
     const places=state.freeform.items.map(it=>[it.x,it.y,it.mi,it.rot*Math.PI/180,1,it.sc]);
-    return{type:'freeform',UW:FF_R,UH:FF_R,places};
+    const U=ffUnits(); // 生地ブロック=FF_BLOCK_CM角固定（U×sizeCm=FF_BLOCK_CM）
+    return{type:'freeform',UW:U,UH:U,places};
   }
   if(state.mode==='tile'&&state.tileSrc){
     const a=state.tileSrc.canvas.height/state.tileSrc.canvas.width;
@@ -3361,7 +3373,7 @@ function enterTileMode(dec){
   $$('#repeatSeg button').forEach(b=>b.classList.toggle('on',b.dataset.id==='full'));
   /* 実寸: 解像度タグから自動。無ければ25cmを仮置き */
   const cm=dec.cmW?Math.round(Math.min(120,Math.max(2,dec.cmW))*10)/10:25;
-  state.sizeCm=cm;
+  setSizeCm(cm);
   $$('.samp').forEach(s=>s.classList.remove('on'));
   /* タイルプレビュー */
   const cv=$('#tileCv'),x=cv.getContext('2d');
@@ -3393,7 +3405,7 @@ function updateModeUI(){
   $('#size').max=tile?120:20;$('#sizeN').max=tile?120:20;
   applySizeGuard();
   if(!tile&&state.sizeCm>20){ // タイルモードの大きなcmを持ち越さない
-    state.sizeCm=20;$('#size').value=20;$('#sizeN').value=20;
+    setSizeCm(20);$('#size').value=20;$('#sizeN').value=20;
     $('#sizeV').innerHTML='20<small>cm・大柄</small>';fill($('#size'));
   }
   $('#sizeLb').textContent=tile?'タイルの実寸幅':'柄の大きさ（主役の実寸）';
@@ -4167,7 +4179,7 @@ function wire(){
   $('#fillerGap').oninput=e=>{state.fillerGap=(+e.target.value)/100;$('#fillerGapV').textContent=e.target.value+'%';fill(e.target);rebuild();};
   const syncSize=v=>{
     const mx2=state.mode==='tile'?120:20;
-    v=Math.min(mx2,Math.max(2,v));state.sizeCm=v;
+    v=Math.min(mx2,Math.max(2,v));setSizeCm(v);
     $('#size').value=v;$('#sizeN').value=v;
     $('#sizeV').innerHTML=v+'<small>cm・'+(state.mode==='tile'?'タイル幅':sizeLabel(v))+'</small>';fill($('#size'));rebuild();
   };
@@ -4294,7 +4306,7 @@ function wire(){
     $('#ffRot').oninput=e=>{const it=state.freeform.items[state.freeform.sel];if(!it)return;
       it.rot=+e.target.value;fill(e.target);$('#ffRotV').textContent=e.target.value+'°';ffre();};
     $('#ffDup').onclick=()=>{const it=state.freeform.items[state.freeform.sel];if(!it)return;
-      state.freeform.items.push({...it,x:(it.x+0.4)%FF_R,y:(it.y+0.4)%FF_R});
+      state.freeform.items.push({...it,x:(it.x+0.4)%ffUnits(),y:(it.y+0.4)%ffUnits()});
       state.freeform.sel=state.freeform.items.length-1;ffSyncUI();ffre();};
     $('#ffDel').onclick=()=>{const s=state.freeform.sel;if(s<0)return;
       state.freeform.items.splice(s,1);state.freeform.sel=-1;ffSyncUI();ffre();};
