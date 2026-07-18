@@ -2162,6 +2162,19 @@ function fitMiniCanvas(canvas){
   const w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));
   if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
 }
+/* 1リピート表示用のppu: 枠80%フィットに必要な解像度まで引き上げる
+   （2026-07-19: 小リピートが1.6倍拡大キャップで枠より小さく描かれる問題の解消。
+   大画面/Retinaではリピートcm×PPCMの素の解像度では枠に届かないため、必要解像度で
+   レンダし直して常にフィットさせる）。12000px上限は既存クランプを踏襲。
+   drawUnitとffViewGeom（ドラッグ座標系）の両方が必ずこの関数を使い、式を共有する */
+function unitViewPpu(lay,w,h){
+  let ppu=state.sizeCm*PPCM*state.zoom;
+  const need=Math.min((w*0.8)/lay.UW,(h*0.8)/lay.UH);
+  if(need>ppu)ppu=need;
+  const maxPpu=Math.min(12000/lay.UW,12000/lay.UH);
+  if(ppu>maxPpu)ppu=maxPpu;
+  return ppu;
+}
 function renderPattern(){
   const cv=$('#patternCv'),ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
   ctx.clearRect(0,0,w,h);
@@ -2173,6 +2186,8 @@ function renderPattern(){
   if(ppu>maxPpu){patScale=ppu/maxPpu;ppu=maxPpu;}
   const u=renderUnit(ppu);
   if(!u)return;
+  /* 1リピート表示用の高解像度ユニット（枠80%フィット・pxPerUキーで別キャッシュ） */
+  const uU=(state.patTab==='unit')?(renderUnit(unitViewPpu(lay,w,h))||u):u;
   /* 敷き詰め(surface)表示の描画本体。柄はタイル無限反復のため任意の幅高に描いても余白が出ない。
      本体キャンバス(cv)とスマホ用ミニプレビュー(#miniCv・収納/展開で縦横比が大きく変わる)の両方から呼ぶ */
   const drawSurface=(tctx,tw,th)=>{
@@ -2240,12 +2255,12 @@ function renderPattern(){
      不具合があった。クロップをやめて両方から同じ関数で描き直すことで構造的に解消する */
   const drawUnit=(tctx,tw,th)=>{
     checker(tctx,tw,th);
-    const s=Math.min((tw*0.8)/u.width,(th*0.8)/u.height,1.6);
-    const dw=u.width*s,dh=u.height*s,ox=(tw-dw)/2,oy=(th-dh)/2;
+    const s=Math.min((tw*0.8)/uU.width,(th*0.8)/uU.height,1.6);
+    const dw=uU.width*s,dh=uU.height*s,ox=(tw-dw)/2,oy=(th-dh)/2;
     tctx.save();tctx.shadowColor='rgba(60,45,30,.25)';tctx.shadowBlur=24;tctx.shadowOffsetY=8;
     if(state.bg!=='transparent'){tctx.fillStyle=state.bg;tctx.fillRect(ox,oy,dw,dh);}
     tctx.restore();
-    tctx.drawImage(u,ox,oy,dw,dh);
+    tctx.drawImage(uU,ox,oy,dw,dh);
     tctx.save();tctx.strokeStyle='rgba(43,38,32,.5)';tctx.setLineDash([7,5]);tctx.lineWidth=1.5;tctx.strokeRect(ox+0.5,oy+0.5,dw,dh);tctx.restore();
     /* F25: 自由配置の選択枠 */
     if(lay.type==='freeform'&&state.freeform.sel>=0){
@@ -3566,6 +3581,7 @@ function updateArrange(){
 }
 /* ---- F25 自由配置の編集UI ---- */
 let ffPaletteSel=0;
+let ffAutoUnit=false; // 自由配置が1リピートタブへ自動切替したか（離脱時の敷き詰め復帰用・保存しない）
 function ffSyncUI(){
   const box=$('#freeformBox');if(!box)return;
   const on=(state.repeat==='freeform'&&state.mode!=='tile');
@@ -3744,9 +3760,7 @@ function openDiscl(panelId){
 function ffViewGeom(){
   const cv=$('#patternCv'),w=cv.width,h=cv.height;
   const lay=state.layout;if(!lay)return null;
-  let ppu=state.sizeCm*PPCM*state.zoom;
-  const maxPpu=Math.min(12000/lay.UW,12000/lay.UH);
-  if(ppu>maxPpu)ppu=maxPpu;
+  const ppu=unitViewPpu(lay,w,h); // drawUnitと同一式（ズレるとドラッグ座標系が壊れる）
   const uw=Math.max(2,Math.round(lay.UW*ppu)),uh=Math.max(2,Math.round(lay.UH*ppu));
   const s=Math.min((w*0.8)/uw,(h*0.8)/uh,1.6);
   return{ox:(w-uw*s)/2,oy:(h-uh*s)/2,dw:uw*s,dh:uh*s,lay};
@@ -3809,6 +3823,14 @@ function buildRepeatSeg(){
       $('#fillerBox').classList.toggle('dis',r.id!=='toss');
       if(r.id==='freeform'&&state.patTab!=='unit'){ // F25: 編集しやすい1リピート表示へ誘導
         state.patTab='unit';$$('#patTabs button').forEach(x2=>x2.classList.toggle('on',x2.dataset.t==='unit'));
+        ffAutoUnit=true; // 自動切替の記録（自由配置を離れたら敷き詰めへ戻すため）
+      }
+      if(r.id!=='freeform'){ // 2026-07-19: 自由配置が自動で切り替えたタブは離脱時に敷き詰めへ戻す
+        if(ffAutoUnit&&state.patTab==='unit'){
+          state.patTab='surface';$$('#patTabs button').forEach(x2=>x2.classList.toggle('on',x2.dataset.t==='surface'));
+          ffTouchSync();
+        }
+        ffAutoUnit=false;
       }
       updateArrange();rebuild();
       if(r.id==='freeform'&&ffModalCanUse())openFfModal(); // F25: スマホは編集シートを自動で開く（明示タップ時のみ・検証フックは非経由）
@@ -4325,7 +4347,7 @@ function wire(){
     $('#fluidModalClose').onclick=closeFluidModal;
     $('#fluidModalDone').onclick=closeFluidModal;
   }
-  $$('#patTabs button').forEach(b=>b.onclick=()=>{state.patTab=b.dataset.t;ffTouchSync();$$('#patTabs button').forEach(x=>x.classList.toggle('on',x===b));renderPattern();});
+  $$('#patTabs button').forEach(b=>b.onclick=()=>{state.patTab=b.dataset.t;ffAutoUnit=false;ffTouchSync();$$('#patTabs button').forEach(x=>x.classList.toggle('on',x===b));renderPattern();});
   $$('#zoomSeg button').forEach(b=>b.onclick=()=>{state.zoom=+b.dataset.z;$$('#zoomSeg button').forEach(x=>x.classList.toggle('on',x===b));
     $('#patternCv').classList.toggle('zoomed',state.zoom>1); // ズーム時のみタッチスクロールを奪う
     renderPattern();});
