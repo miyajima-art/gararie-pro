@@ -2292,16 +2292,22 @@ function renderPattern(){
       const minorX=cmPxX>=14,minorY=cmPxY>=14;
       tctx.font=Math.round(RWu*0.55)+'px ui-monospace,monospace';
       tctx.fillStyle='rgba(43,38,32,.75)';tctx.strokeStyle='#2b2620';
+      /* 大きなリピートではcm間隔が詰まりラベルが重なるため、表示幅に応じて
+         ラベル・目盛りの刻みを自動で粗くする（5→10→20→50→100cm） */
+      const labNeed=tctx.measureText('000').width*1.5;
+      const stepFor=cmPx=>{for(const s of[5,10,20,50,100])if(s*cmPx>=labNeed)return s;return 200;};
+      const lsX=stepFor(cmPxX),lsY=stepFor(cmPxY);
+      const tsX=Math.max(5,lsX/5),tsY=Math.max(5,lsY/5); // 中目盛りはラベル刻みの1/5（最小5cm）
       for(let i=0,x=ox;x<=ox+dw+0.5;i++,x=ox+i*cmPxX){
-        if(!minorX&&i%5)continue;
-        const major=i%5===0;
+        if(!minorX&&i%tsX)continue;
+        const major=i%lsX===0;
         tctx.lineWidth=major?1.5:1;
         tctx.beginPath();tctx.moveTo(Math.round(x)+0.5,oy);tctx.lineTo(Math.round(x)+0.5,oy-(major?RWu*0.55:RWu*0.3));tctx.stroke();
         if(major&&i>0)tctx.fillText(String(i),Math.round(x)+3,oy-RWu*0.6);
       }
       for(let i=0,y=oy;y<=oy+dh+0.5;i++,y=oy+i*cmPxY){
-        if(!minorY&&i%5)continue;
-        const major=i%5===0;
+        if(!minorY&&i%tsY)continue;
+        const major=i%lsY===0;
         tctx.lineWidth=major?1.5:1;
         tctx.beginPath();tctx.moveTo(ox,Math.round(y)+0.5);tctx.lineTo(ox-(major?RWu*0.55:RWu*0.3),Math.round(y)+0.5);tctx.stroke();
         if(major&&i>0)tctx.fillText(String(i),ox-RWu*0.95,Math.round(y)-3);
@@ -2312,8 +2318,8 @@ function renderPattern(){
     const labelFsU=Math.round(22*pxScaleU);
     tctx.save();tctx.font=labelFsU+'px ui-monospace,monospace';tctx.fillStyle='rgba(43,38,32,.8)';
     const labelWU=tctx.measureText(cmW+'cm').width;
-    tctx.fillText(cmW+'cm',ox+dw/2-labelWU/2,oy-RWu-labelFsU*0.3>labelFsU?oy-RWu-labelFsU*0.3:oy+dh+RWu+labelFsU);
-    tctx.save();tctx.translate(ox-RWu-labelFsU*0.4>labelFsU?ox-RWu-labelFsU*0.4:ox+dw+RWu+labelFsU*0.6,oy+dh/2+labelFsU*0.35);tctx.rotate(-Math.PI/2);tctx.fillText(cmH+'cm',0,0);tctx.restore();
+    tctx.fillText(cmW+'cm',ox+dw/2-labelWU/2,Math.min(oy-RWu-labelFsU*0.3>labelFsU?oy-RWu-labelFsU*0.3:oy+dh+RWu+labelFsU,th-labelFsU*0.35));
+    tctx.save();tctx.translate(Math.min(ox-RWu-labelFsU*0.4>labelFsU?ox-RWu-labelFsU*0.4:ox+dw+RWu+labelFsU*0.6,tw-labelFsU*0.35),oy+dh/2+labelFsU*0.35);tctx.rotate(-Math.PI/2);tctx.fillText(cmH+'cm',0,0);tctx.restore();
     tctx.restore();
   };
   if(state.patTab==='unit'){
@@ -4420,7 +4426,7 @@ function wire(){
       setTimeout(()=>{
         try{
           const t=buildPrintTile(state.dpi);
-          if(!t){$('#exMsg').textContent='生成できませんでした（サイズ超過）';return;}
+          if(!t){$('#exMsg').textContent='生成できませんでした（デザイン未作成またはサイズ超過）';return;}
           const r=encodeTiff(t.w,t.h,t.rgb,state.dpi);
           download(r.blob,tileName('tif'));
           $('#exMsg').textContent=`✓ 書き出しました ${t.w}×${t.h}px ${(r.bytes/1048576).toFixed(1)}MB（${r.usePB?'PackBits圧縮':'無圧縮'}）`;
@@ -4431,7 +4437,7 @@ function wire(){
       $('#exMsg').textContent='生成中…';
       setTimeout(()=>{
         const t=buildPrintTile(state.dpi);
-        if(!t){$('#exMsg').textContent='生成できませんでした（サイズ超過）';return;}
+        if(!t){$('#exMsg').textContent='生成できませんでした（デザイン未作成またはサイズ超過）';return;}
         const c=makeCanvas(t.w,t.h),x=c.getContext('2d'),im=x.createImageData(t.w,t.h);
         for(let p=0,q=0;q<t.rgb.length;p+=4,q+=3){im.data[p]=t.rgb[q];im.data[p+1]=t.rgb[q+1];im.data[p+2]=t.rgb[q+2];im.data[p+3]=255;}
         x.putImageData(im,0,0);
@@ -4446,7 +4452,7 @@ function wire(){
       setTimeout(()=>{
         try{
           const t=buildPrintTile(state.dpi);
-          if(!t){$('#exMsg').textContent='生成できませんでした（サイズ超過）';return;}
+          if(!t){$('#exMsg').textContent='生成できませんでした（デザイン未作成またはサイズ超過）';return;}
           const c=makeCanvas(t.w,t.h),x=c.getContext('2d'),im=x.createImageData(t.w,t.h);
           for(let p=0,q=0;q<t.rgb.length;p+=4,q+=3){im.data[p]=t.rgb[q];im.data[p+1]=t.rgb[q+1];im.data[p+2]=t.rgb[q+2];im.data[p+3]=255;}
           x.putImageData(im,0,0);
@@ -4642,7 +4648,7 @@ function init(){
   }
   else if(Q.get('preset')==='swn')applyDemoTile();
   else if(TILE_SAMPLES[Q.get('preset')])applySample(TILE_SAMPLES[Q.get('preset')]);
-  else applySample(TILE_SAMPLES.fd0201); // 既定＝さくらんぼ
+  /* pro版: 既定デザインは読み込まない（空の状態で起動） */
 }
 /* PCではプレビューcanvasのバッファを表示ボックス実寸(×dpr)に合わせ、枠いっぱいに描画 */
 function fitPvCanvases(){
