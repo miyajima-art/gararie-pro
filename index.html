@@ -1545,7 +1545,7 @@ function buildLayout(){
     const V=4;let nCols,nRows,cond=null,offX=null,offY=null;
     if(repeat==='half'){nCols=den*Math.max(1,Math.round(V/den));nRows=V;offY=c=>pitch*((c%den)/den);}
     else if(repeat==='brick'){nRows=den*Math.max(1,Math.round(V/den));nCols=V;offX=r=>pitch*((r%den)/den);}
-    else if(repeat==='diamond'){nCols=V;nRows=V;offX=(r)=>((r&1)?pitch*0.5:0);}
+    else if(repeat==='diamond'){nCols=V;nRows=V;cond=(c,r)=>((c+r)%2)===0;} // 菱形格子＝市松抜き（2026-07-19修正・旧実装は奇数行0.5ずらし＝ブリック1/2と同一だった）
     else if(repeat==='sateen'){nCols=5;nRows=5;cond=(c,r)=>(r%5)===((c*2)%5);}
     else{nCols=V;nRows=V;}
     /* 複数モチーフの並び周期がタイル寸法を割り切るよう格子をLの倍数へ拡張
@@ -1556,9 +1556,13 @@ function buildLayout(){
       if(arr==='checker'){nCols=lcmi(nCols,L);nRows=lcmi(nRows,L);}
       else if(arr==='col'){nCols=lcmi(nCols,L);}
       else if(arr==='row'){nRows=lcmi(nRows,L);}
+      /* リピートは正方形に保つ（2026-07-19修正・片方向だけ拡張すると横長/縦長タイルになる）。
+         互いのlcmで拡張しても敷き詰めの柄は同一＝1リピート表示とリピート寸法表記だけが整う */
+      nRows=lcmi(nRows,nCols);nCols=lcmi(nCols,nRows);
     }
     UW=nCols*pitch;UH=nRows*pitch;
-    const pick=(c,r)=>{if(L<2)return 0;if(arr==='row')return r%L;if(arr==='col')return c%L;if(arr==='random')return(rand()*L)|0;return(c+r)%L;};
+    /* ダイヤは市松抜き格子のため(c+r)が常に偶数＝checkerを(c+r)%Lにすると単一柄化する→c%Lで交互 */
+    const pick=(c,r)=>{if(L<2)return 0;if(arr==='row')return r%L;if(arr==='col')return c%L;if(arr==='random')return(rand()*L)|0;return(repeat==='diamond'?c:c+r)%L;};
     for(let r=0;r<nRows;r++)for(let c=0;c<nCols;c++){
       const rot=jit(),mi=pick(c,r); // randはセル順で消費（cond前に呼び決定論維持）
       if(cond&&!cond(c,r))continue;
