@@ -510,7 +510,7 @@
         </div>
         </div>
       </div>
-      <div class="samples">
+      <div class="samples" style="display:none"><!-- pro版: 見本柄ギャラリーは非表示 -->
         <div class="cap"><span>SAMPLE</span><em>そのまま使える見本柄</em></div>
         <div class="sampgrid" id="sampGrid"></div>
       </div>
@@ -725,9 +725,14 @@
     </div>
 
     
-    <div class="bottom" id="studioWrap">
+    <div id="testout"></div>
+  </main>
+</div>
+
+<section class="bottomwrap">
+<div class="bottom" id="studioWrap">
       <div class="card" id="studioCard">
-        <h2><span class="no">ST</span><span class="t">書き出し（JPG・TIFF・PNG）</span></h2>
+        <h2><span class="no">07</span><span class="t">書き出し（JPG・TIFF・PNG）</span></h2>
         <div class="demo">Mimaki RIP（TxLink/RasterLink）へそのまま入稿できる1リピートタイル</div>
         <label class="lb">解像度</label>
         <div class="segline" id="dpiSeg" style="max-width:280px">
@@ -751,14 +756,9 @@
         <div class="note">透過背景は白地に合成して書き出します。画面の色は参考表示（実発色はRIPプロファイル＋物理スワッチ色校正が基準）。</div>
       </div>
     </div>
-    <div id="testout"></div>
-  </main>
-</div>
-
-<section class="bottomwrap">
 <div class="bottom">
       <div class="card">
-        <h2><span class="no">07</span><span class="t">保存・呼び出し</span></h2>
+        <h2><span class="no">08</span><span class="t">保存・呼び出し</span></h2>
         <div class="demo">仕上がりイメージの書き出しと、デザインレシピ（.gararieファイル）の保存・呼び出し</div>
         <div class="exbtns" style="margin-top:4px">
           <button class="png" id="dlMock" style="flex:1"><svg class="ic" viewBox="0 0 24 24"><path d="M7 4l3-1 2 2 2-2 3 1 3 4-3 2v11H7V10L4 8z"/></svg>仕上がりイメージ（JPG）</button>
