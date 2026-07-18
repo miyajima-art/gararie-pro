@@ -2927,101 +2927,146 @@ function dgOutline(ctx){
   ctx.closePath();
 }
 function drawDogTee(ctx,ppcm){
+  /* 犬服着用モック（2026-07-19全面改稿・参考写真=トイプードル前後）
+     前面＝お座り正面（胸パネル・前脚が手前）／背面＝後ろ姿（背中パネルが主役）。
+     身幅20cm＝胸パネル幅316px（ppcm15.8と整合）・着丈28cm＝襟442px裾 */
   const bg=(state.bg!=='transparent')?state.bg:'#ffffff';
-  const{cx,mx,neckY,neckRx,neckRy:_fRy,backRy:_bRy0}=DG;
-  const backV=(state.prodSide==='back');           // F20 背面ビュー＝襟ぐりを浅く
-  const neckRy=backV?26:_fRy, backRy=backV?12:_bRy0, bandW0=backV?11:13;
+  const backV=(state.prodSide==='back');
+  const cx=450,mx=x=>900-x,TAU2=Math.PI*2;
+  const COAT='#ecc794',EAR='#e2b57e',MUZ='#f6e3c2',NOSE='#5d3f2a',EYE='#38281c';
+  const rnd=mulberry32(backV?4242:1717);
   stageBase(ctx);
-  softShadow(ctx,cx,824,300,48,0.30);
+  softShadow(ctx,cx,948,340,40,0.30);
   ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
-  /* 生地ベース（全体・落ち影つき） */
-  ctx.save();ctx.beginPath();dgOutline(ctx);
-  ctx.shadowColor='rgba(74,64,52,.22)';ctx.shadowBlur=28;ctx.shadowOffsetY=13;
+  /* --- もこもこ描画ヘルパー ---
+     blobはseed固定＝fillとshadeで同一パスを再現でき、陰影をブロブ形状でクリップできる
+     （クリップしないとmultiply楕円がはみ出してリング状の影が出る）。bs=こぶの大きさ係数 */
+  const blob=(x,y,rx,ry,n,seed,bs)=>{const r2=mulberry32(seed);
+    ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,TAU2);
+    for(let i=0;i<n;i++){const a=(i+r2()*0.5)/n*TAU2;
+      const bx=x+Math.cos(a)*rx*0.95,by=y+Math.sin(a)*ry*0.95,br=Math.max(rx,ry)*(bs||0.14)*(0.8+r2()*0.5);
+      ctx.moveTo(bx+br,by);ctx.arc(bx,by,br,0,TAU2);}};
+  const coatFill=(x,y,rx,ry,n,seed,col,bs)=>{blob(x,y,rx,ry,n,seed,bs);ctx.fillStyle=col||COAT;ctx.fill();};
+  const coatShade=(x,y,rx,ry,n,seed,bs)=>{ctx.save();blob(x,y,rx,ry,n,seed,bs);ctx.clip();
+    ctx.globalCompositeOperation='multiply';
+    const g2=ctx.createRadialGradient(x-rx*0.3,y-ry*0.35,Math.min(rx,ry)*0.25,x,y,Math.max(rx,ry)*1.18);
+    g2.addColorStop(0,'rgba(255,255,255,0)');g2.addColorStop(1,'rgba(172,122,62,.34)');
+    ctx.fillStyle=g2;ctx.fillRect(x-rx*1.5,y-ry*1.5,rx*3,ry*3);ctx.restore();};
+  const curls=(x,y,rx,ry,n)=>{ctx.save();ctx.strokeStyle='rgba(160,110,55,.26)';ctx.lineWidth=2;
+    for(let i=0;i<n;i++){const a=rnd()*TAU2,rr=Math.sqrt(rnd());
+      const px2=x+Math.cos(a)*rx*rr*0.8,py=y+Math.sin(a)*ry*rr*0.8,cr=4.5+rnd()*7,s=rnd()*TAU2;
+      ctx.beginPath();ctx.arc(px2,py,cr,s,s+Math.PI*(0.9+rnd()*0.5));ctx.stroke();}
+    ctx.restore();};
+  const paw=(x,y,rx,ry,seed)=>{coatFill(x,y,rx,ry,8,seed,COAT,0.1);coatShade(x,y,rx,ry,8,seed,0.1);
+    ctx.strokeStyle='rgba(150,102,50,.4)';ctx.lineWidth=2;
+    for(const d of[-0.34,0.34]){ctx.beginPath();ctx.moveTo(x+rx*d,y-ry*0.7);ctx.lineTo(x+rx*d,y+ry*0.25);ctx.stroke();}};
+  /* --- 服パネル（前後共通シルエット・襟深さのみ差） --- */
+  const gTop=backV?398:408,neckY2=backV?398:415,hemY=857;
+  const garment=c2=>{c2.moveTo(300,gTop+20);
+    c2.quadraticCurveTo(286,470,292,560);
+    c2.quadraticCurveTo(296,712,306,802);
+    c2.quadraticCurveTo(332,hemY,450,hemY);
+    c2.quadraticCurveTo(mx(332),hemY,mx(306),802);
+    c2.quadraticCurveTo(mx(296),712,mx(292),560);
+    c2.quadraticCurveTo(mx(286),470,mx(300),gTop+20);
+    c2.quadraticCurveTo(mx(370),gTop-8,450,gTop-8);
+    c2.quadraticCurveTo(370,gTop-8,300,gTop+20);
+    c2.closePath();};
+  /* --- 1. 服より奥の体 --- */
+  if(backV){
+    coatFill(cx,846,190,102,16,11,COAT,0.12);coatShade(cx,846,190,102,16,11,0.12); // おしり
+    paw(cx-178,946,46,25,12);paw(mx(cx-178),946,46,25,13);              // 後ろ足先
+  }else{
+    coatFill(cx-196,822,82,102,12,21,COAT,0.12);coatFill(mx(cx-196),822,82,102,12,22,COAT,0.12); // 後脚もも
+    coatShade(cx-196,822,82,102,12,21,0.12);coatShade(mx(cx-196),822,82,102,12,22,0.12);
+    paw(cx-206,944,45,25,23);paw(mx(cx-206),944,45,25,24);              // 後ろ足先（外側）
+  }
+  coatFill(cx,610,188,232,16,31,COAT,0.11);                             // 胴
+  coatFill(272,460,40,50,10,32,COAT,0.12);coatFill(mx(272),460,40,50,10,33,COAT,0.12); // 肩の毛（アームホール外）
+  /* --- 2. 服パネル --- */
+  ctx.save();ctx.beginPath();garment(ctx);
+  ctx.shadowColor='rgba(74,64,52,.20)';ctx.shadowBlur=22;ctx.shadowOffsetY=10;
   ctx.fillStyle=bg;ctx.fill();ctx.restore();
-  /* 柄（袖なし＝1パネル） */
-  ctx.save();ctx.beginPath();dgOutline(ctx);ctx.clip();
+  ctx.save();ctx.beginPath();garment(ctx);ctx.clip();
   ctx.fillStyle=bg;ctx.fillRect(0,0,DS_W,DS_H);
   const pat=patFor(ctx,ppcm,0,0,0);
   if(pat){ctx.fillStyle=pat;ctx.fillRect(0,0,DS_W,DS_H);}
-  /* シェーディング（柄の上から乗算） */
   ctx.globalCompositeOperation='multiply';
-  let g=ctx.createLinearGradient(240,0,660,0);
-  g.addColorStop(0,SH(0.16));g.addColorStop(0.3,SH(0));g.addColorStop(0.7,SH(0));g.addColorStop(1,SH(0.16));
-  ctx.fillStyle=g;ctx.fillRect(0,0,DS_W,DS_H);                          // 円筒（両脇）
-  g=ctx.createRadialGradient(cx,neckY+neckRy,8,cx,neckY+neckRy,140);
-  g.addColorStop(0,SH(0.10));g.addColorStop(1,SH(0));ctx.fillStyle=g;ctx.fillRect(0,0,DS_W,DS_H); // 襟下
-  for(const px2 of[298,mx(298)]){                                       // アームホール下AO
-    g=ctx.createRadialGradient(px2,462,4,px2,462,90);
-    g.addColorStop(0,SH(0.12));g.addColorStop(1,SH(0));ctx.fillStyle=g;ctx.fillRect(0,0,DS_W,DS_H);
-  }
-  for(const[dx0,dy0,dx1,dy1,al]of[[380,470,330,760,0.05],[540,450,580,750,0.045]]){ // ドレープ2本
-    g=ctx.createLinearGradient(dx0,dy0,dx0+32,dy0);
-    g.addColorStop(0,SH(0));g.addColorStop(0.5,SH(al));g.addColorStop(1,SH(0));
-    ctx.save();ctx.translate(dx0,dy0);ctx.rotate(Math.atan2(dy1-dy0,dx1-dx0)-Math.PI/2);ctx.translate(-dx0,-dy0);
-    ctx.fillStyle=g;ctx.fillRect(dx0-38,dy0-56,76,400);ctx.restore();
-  }
+  let g=ctx.createLinearGradient(292,0,608,0);
+  g.addColorStop(0,SH(0.17));g.addColorStop(0.28,SH(0));g.addColorStop(0.72,SH(0));g.addColorStop(1,SH(0.17));
+  ctx.fillStyle=g;ctx.fillRect(0,0,DS_W,DS_H);                         // 円筒（両脇）
+  g=ctx.createRadialGradient(cx,neckY2+26,10,cx,neckY2+26,150);
+  g.addColorStop(0,SH(backV?0.07:0.11));g.addColorStop(1,SH(0));ctx.fillStyle=g;ctx.fillRect(0,0,DS_W,DS_H); // 襟下
+  g=ctx.createLinearGradient(0,780,0,hemY);
+  g.addColorStop(0,SH(0));g.addColorStop(1,SH(0.12));ctx.fillStyle=g;ctx.fillRect(0,0,DS_W,DS_H); // 裾だまり
   ctx.globalCompositeOperation='source-over';
   ctx.restore();
-  applyGrain(ctx,dgOutline,0.16);
-  /* 光源（左上ソフトライト） */
-  ctx.save();ctx.beginPath();dgOutline(ctx);ctx.clip();
+  applyGrain(ctx,garment,0.15);
+  ctx.save();ctx.beginPath();garment(ctx);ctx.clip();                  // 左上ソフトライト
   ctx.globalCompositeOperation='soft-light';
-  g=ctx.createRadialGradient(350,300,60,450,520,560);
-  g.addColorStop(0,'rgba(255,255,255,.55)');g.addColorStop(1,'rgba(90,74,56,.35)');
+  g=ctx.createRadialGradient(360,470,60,450,620,540);
+  g.addColorStop(0,'rgba(255,255,255,.5)');g.addColorStop(1,'rgba(90,74,56,.32)');
   ctx.fillStyle=g;ctx.fillRect(0,0,DS_W,DS_H);
   ctx.globalCompositeOperation='source-over';ctx.restore();
-  /* 首の開口部（前襟深い・後ろ襟浅い） */
-  const openPath=()=>{ctx.beginPath();
-    ctx.ellipse(cx,neckY,neckRx,backRy,0,Math.PI,0);
-    ctx.ellipse(cx,neckY,neckRx,neckRy,0,0,Math.PI);
-    ctx.closePath();};
-  ctx.save();openPath();ctx.clip();
-  ctx.fillStyle=bg;ctx.fillRect(0,0,DS_W,DS_H);
-  g=ctx.createLinearGradient(0,neckY-backRy,0,neckY+neckRy);
-  g.addColorStop(0,SH(0.34));g.addColorStop(0.45,SH(0.10));g.addColorStop(1,SH(0.02));
-  ctx.fillStyle=g;ctx.fillRect(0,0,DS_W,DS_H);
-  ctx.beginPath();ctx.ellipse(cx,neckY+4,neckRx-9,backRy+5,0,Math.PI,0);
-  ctx.lineWidth=9;ctx.strokeStyle=bg;ctx.stroke();
-  ctx.beginPath();ctx.ellipse(cx,neckY+4,neckRx-9,backRy+5,0,Math.PI,0);
-  ctx.lineWidth=9;ctx.strokeStyle=SH(0.14);ctx.stroke();
+  /* 裾・アームホールのステッチ＋輪郭 */
+  ctx.save();ctx.setLineDash([3,2.5]);ctx.lineWidth=1.1;ctx.strokeStyle=SH(0.35);
+  ctx.beginPath();ctx.moveTo(316,812);ctx.quadraticCurveTo(340,hemY-11,450,hemY-11);
+  ctx.quadraticCurveTo(mx(340),hemY-11,mx(316),812);ctx.stroke();
+  for(const M of[v=>v,mx]){ctx.beginPath();ctx.moveTo(M(302),gTop+24);ctx.quadraticCurveTo(M(292),480,M(298),556);ctx.stroke();}
   ctx.restore();
-  /* リブ襟バンド（前襟ぐり沿い） */
+  ctx.beginPath();garment(ctx);ctx.lineWidth=1.6;ctx.strokeStyle='rgba(58,47,35,.32)';ctx.stroke();
+  /* リブ襟バンド（下半円・頭の下に見える部分） */
   (function(){
-    const bandW=bandW0;
-    ctx.save();openPath();ctx.clip();
-    ctx.beginPath();ctx.ellipse(cx,neckY,neckRx-bandW/2,neckRy-bandW/2,0,-0.05*Math.PI,1.05*Math.PI);
+    const bandW=backV?15:18,nRx=102,nRy=backV?20:30;
+    ctx.beginPath();ctx.ellipse(cx,neckY2,nRx,nRy,0,0,Math.PI);
     ctx.lineWidth=bandW;ctx.strokeStyle=bg;ctx.stroke();
-    ctx.beginPath();ctx.ellipse(cx,neckY,neckRx-bandW/2,neckRy-bandW/2,0,-0.05*Math.PI,1.05*Math.PI);
-    ctx.lineWidth=bandW;ctx.strokeStyle='rgba(255,255,255,.14)';ctx.stroke();
-    ctx.lineWidth=1;ctx.strokeStyle=SH(0.18);
-    for(let t=0.04;t<=0.96;t+=1/24){
-      const a=Math.PI*t;
-      const x1=cx+Math.cos(a)*(neckRx-bandW+1),y1=neckY+Math.sin(a)*(neckRy-bandW+1);
-      const x2=cx+Math.cos(a)*(neckRx-1),y2=neckY+Math.sin(a)*(neckRy-1);
-      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(cx,neckY2,nRx,nRy,0,0,Math.PI);
+    ctx.lineWidth=bandW;ctx.strokeStyle='rgba(58,47,35,.08)';ctx.stroke();
+    ctx.lineWidth=1;ctx.strokeStyle=SH(0.2);
+    for(let t=0.06;t<0.94;t+=1/26){const a=Math.PI*t;
+      const x1=cx+Math.cos(a)*(nRx-1),y1=neckY2+Math.sin(a)*(nRy-bandW*0.45),
+            x2=cx+Math.cos(a)*(nRx-1),y2=neckY2+Math.sin(a)*(nRy+bandW*0.45);
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
+    ctx.beginPath();ctx.ellipse(cx,neckY2,nRx,nRy+bandW/2,0,0.04*Math.PI,0.96*Math.PI);
+    ctx.lineWidth=1.3;ctx.strokeStyle='rgba(58,47,35,.35)';ctx.stroke();
+  })();
+  /* --- 3. 服より手前の体 --- */
+  if(!backV){
+    let sd=41;
+    for(const M of[v=>v,mx]){                                          // 前脚（手前）
+      coatFill(M(cx-88),770,44,158,14,sd,COAT,0.07);
+      coatShade(M(cx-88),770,44,158,14,sd,0.07);
+      paw(M(cx-92),938,49,27,sd+2);sd++;
+    }
+  }
+  /* --- 4. 頭・耳 --- */
+  coatFill(cx-150,268,57,102,12,51,EAR);coatFill(mx(cx-150),268,57,102,12,52,EAR); // 耳
+  coatShade(cx-150,268,57,102,12,51);coatShade(mx(cx-150),268,57,102,12,52);
+  curls(cx-150,268,50,94,10);curls(mx(cx-150),268,50,94,10);
+  coatFill(cx,196,148,138,16,53);                                      // 頭
+  ctx.save();ctx.globalCompositeOperation='soft-light';                // 頭のハイライト
+  g=ctx.createRadialGradient(cx-50,140,20,cx,200,210);
+  g.addColorStop(0,'rgba(255,255,255,.6)');g.addColorStop(1,'rgba(120,90,55,.25)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,196,160,150,0,0,TAU2);ctx.fill();ctx.restore();
+  curls(cx,170,130,110,26);
+  if(!backV){
+    ctx.save();
+    ctx.fillStyle=MUZ;ctx.beginPath();ctx.ellipse(cx,262,58,46,0,0,TAU2);ctx.fill(); // マズル
+    ctx.fillStyle=NOSE;ctx.beginPath();ctx.ellipse(cx,240,17,12,0,0,TAU2);ctx.fill(); // 鼻
+    ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(cx-5,236,5,3.4,0,0,TAU2);ctx.fill();
+    ctx.strokeStyle='rgba(93,63,42,.75)';ctx.lineWidth=2.4;
+    ctx.beginPath();ctx.moveTo(cx,252);ctx.lineTo(cx,266);ctx.stroke();               // 人中
+    ctx.beginPath();ctx.arc(cx-13,266,13,0.15*Math.PI,0.85*Math.PI);ctx.stroke();     // 口
+    ctx.beginPath();ctx.arc(cx+13,266,13,0.15*Math.PI,0.85*Math.PI);ctx.stroke();
+    for(const M of[v=>v,mx]){                                                          // 目
+      ctx.fillStyle=EYE;ctx.beginPath();ctx.ellipse(M(cx-58),206,15,16,0,0,TAU2);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(M(cx-63),200,4.5,0,TAU2);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.arc(M(cx-54),212,2.4,0,TAU2);ctx.fill();
     }
     ctx.restore();
-    ctx.save();
-    ctx.beginPath();ctx.ellipse(cx,neckY,neckRx,neckRy,0,0,Math.PI);
-    ctx.lineWidth=1.4;ctx.strokeStyle='rgba(58,47,35,.4)';ctx.stroke();
-    ctx.beginPath();ctx.ellipse(cx,neckY,neckRx-bandW,neckRy-bandW,0,0.03*Math.PI,0.97*Math.PI);
-    ctx.lineWidth=1.1;ctx.strokeStyle='rgba(58,47,35,.30)';ctx.stroke();
-    ctx.beginPath();ctx.ellipse(cx,neckY,neckRx,backRy,0,Math.PI,0);
-    ctx.lineWidth=1.4;ctx.strokeStyle='rgba(58,47,35,.4)';ctx.stroke();
-    ctx.restore();
-  })();
-  /* ステッチ（アームホールの縁取り・裾） */
-  ctx.save();ctx.setLineDash([3,2.5]);ctx.lineWidth=1.1;ctx.strokeStyle=SH(0.35);
-  for(const side of[1,-1]){
-    const M=side>0?(v=>v):(v=>mx(v));
-    ctx.beginPath();ctx.moveTo(M(272),276);ctx.quadraticCurveTo(M(330),388,M(302),470);ctx.stroke();
+  }else{
+    coatShade(cx,196,148,138,16,53);                                    // 後頭部の陰
   }
-  ctx.beginPath();ctx.moveTo(248,684);ctx.quadraticCurveTo(306,762,450,772);
-  ctx.quadraticCurveTo(mx(306),762,mx(248),684);ctx.stroke();
-  ctx.restore();
-  /* 輪郭 */
-  ctx.beginPath();dgOutline(ctx);
-  ctx.lineWidth=1.6;ctx.strokeStyle='rgba(58,47,35,.34)';ctx.stroke();
   ctx.restore();
 }
 
@@ -3043,10 +3088,10 @@ const PRODUCTS={
       {x1:728,y1:277,x2:728,y2:733,label:'着丈 42cm'},
       {x1:262,y1:302,x2:196,y2:418,label:'袖丈 12cm',lx:-52},
     ]},
-  dog:{lb:'犬服',ppcm:15.8,zoomOff:80,draw:drawDogTee,hasSides:true,       // F19: 小型犬タンク平置き・胴回り40cm→平置き身幅20cm(仮値・先方確認中)÷pit幅316px=15.8
+  dog:{lb:'犬服',ppcm:15.8,zoomOff:80,draw:drawDogTee,hasSides:true,       // F19: 小型犬タンク着用モック・身幅20cm(仮値)÷胸パネル幅316px=15.8・着丈28cm=442px(襟415→裾857)
     dims:[
-      {x1:292,y1:492,x2:608,y2:492,label:'身幅 20cm'},
-      {x1:750,y1:248,x2:750,y2:786,label:'着丈 28cm'},
+      {x1:292,y1:560,x2:608,y2:560,label:'身幅 20cm'},
+      {x1:770,y1:415,x2:770,y2:857,label:'着丈 28cm'},
     ]},
   tote:{lb:'トート',ppcm:10.42,zoomOff:40,draw:drawTote,      // 一般的なコットントート相場・幅38cm÷座標幅396px=10.42。コード内に実寸根拠なく社長確認のうえ採用
     dims:[
